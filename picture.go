@@ -450,6 +450,10 @@ func (f *File) GetPicture(sheet, cell string) (string, []byte, error) {
 	}
 	col--
 	row--
+	return f.GetPictureByRowCol(sheet, row, col)
+}
+
+func (f *File) GetPictureByRowCol(sheet string, row, col int) (string, []byte, error) {
 	xlsx, err := f.workSheetReader(sheet)
 	if err != nil {
 		return "", nil, err
