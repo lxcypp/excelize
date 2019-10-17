@@ -16,6 +16,7 @@ import (
 	"errors"
 	"image"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -471,6 +472,57 @@ func (f *File) GetPictureByRowCol(sheet string, row, col int) (string, []byte, e
 		strings.Replace(target, "../drawings", "xl/drawings/_rels", -1), ".xml", ".xml.rels", -1)
 
 	return f.getPicture(row, col, drawingXML, drawingRelationships)
+}
+
+type PicturePos struct {
+	Filename string
+	Bytes    []byte
+	Row      int
+	Col      int
+}
+
+func (f *File) GetAllPictures(sheet string) map[string]*PicturePos {
+	allPics := make(map[string]*PicturePos)
+	xlsx, err := f.workSheetReader(sheet)
+	if err != nil {
+		return allPics
+	}
+	if xlsx.Drawing == nil {
+		return allPics
+	}
+	target := f.getSheetRelationshipsTargetByID(sheet, xlsx.Drawing.RID)
+	drawingXML := strings.Replace(target, "..", "xl", -1)
+	log.Println(drawingXML)
+	drawingRelationships := strings.Replace(
+		strings.Replace(target, "../drawings", "xl/drawings/_rels", -1), ".xml", ".xml.rels", -1)
+
+	for k, v := range f.XLSX {
+		_, ok := supportImageTypes[filepath.Ext(k)]
+		if ok {
+			allPics[filepath.Base(k)] = &PicturePos{filepath.Base(k), v, -1, -1}
+			// log.Println(filepath.Base(k))
+		}
+	}
+
+	decodeWsDr := decodeWsDr{}
+	_ = xml.Unmarshal(namespaceStrictToTransitional(f.readXML(drawingXML)), &decodeWsDr)
+	for _, anchor := range decodeWsDr.TwoCellAnchor {
+		decodeTwoCellAnchor := decodeTwoCellAnchor{}
+		_ = xml.Unmarshal([]byte("<decodeTwoCellAnchor>"+anchor.Content+"</decodeTwoCellAnchor>"), &decodeTwoCellAnchor)
+		if decodeTwoCellAnchor.From != nil && decodeTwoCellAnchor.Pic != nil {
+			xlsxRelationship := f.getDrawingRelationships(drawingRelationships, decodeTwoCellAnchor.Pic.BlipFill.Blip.Embed)
+			// log.Println(i, filepath.Base(xlsxRelationship.Target), anchor.From.Row, anchor.From.Col)
+			_, ok := supportImageTypes[filepath.Ext(xlsxRelationship.Target)]
+			if ok {
+				_, ok1 := allPics[filepath.Base(xlsxRelationship.Target)]
+				if ok1 {
+					allPics[filepath.Base(xlsxRelationship.Target)].Row = anchor.From.Row
+					allPics[filepath.Base(xlsxRelationship.Target)].Col = anchor.From.Col
+				}
+			}
+		}
+	}
+	return allPics
 }
 
 // getPicture provides a function to get picture base name and raw content

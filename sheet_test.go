@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/360EntSecGroup-Skylar/excelize/v2"
+	"github.com/lxcypp/excelize/v2"
 
 	"github.com/mohae/deepcopy"
 	"github.com/stretchr/testify/assert"
